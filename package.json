@@ -1,8 +1,8 @@
 {
-  "name": "js-boilerplate-component",
+  "name": "scorm-component",
   "version": "1.0.1",
   "main": "index.js",
-  "repository": "https://github.com/pandasuite/js-boilerplate-component.git",
+  "repository": "https://github.com/pandasuite/scorm-component.git",
   "private": true,
   "scripts": {
     "start": "webpack-dev-server --open",

@@ -2,73 +2,136 @@
   "version": "2.0.0",
   "main": "",
 
-  "system": {
-    "localization": false,
-    "actions": [
-      {
-        "id": "toMarker",
-        "name": "Change Image",
-        "locale_name": {
-          "fr_FR": "Change Image"
-        },
-        "params": [
-          { "id": "useless", "name": "Useless", "locale_name": {"fr_FR": "Inutile"}, "type": "Boolean" }
-        ]
-      }
-    ],
-    "events": [
-      {
-        "id": "triggerMarker",
-        "name": "Image",
-        "locale_name": {
-          "fr_FR": "Image"
-        }
-      }
-    ],
-    "markers": [
-      {
-        "params": [
-          { "id": "src", "name": "Source", "locale_name": {"fr_FR": "Source"}, "type": "String" }
-        ]
-      }
-    ]
-  },
-
   "properties": [
     {
-      "id": "searchTerm",
-      "name": "Search Term",
+      "id": "score.min",
+      "type": "Integer",
+      "name": "Score min",
       "locale_name": {
-        "fr_FR": "Terme de recherche"
+        "fr_FR": "Score minimum"
+      },
+      "value": 0
+    },
+    {
+      "id": "score.max",
+      "type": "Integer",
+      "name": "Score max",
+      "locale_name": {
+        "fr_FR": "Score maximum"
+      },
+      "value": 100
+    },
+    {
+      "id": "id",
+      "name": "Identifier",
+      "locale_name": {
+        "fr_FR": "Identifiant"
       },
       "type": "String",
-      "value": "panda"
-    }
-  ],
-
-  "events": [
+      "value": "scorm"
+    },
     {
-      "id": "imageChanged",
-      "name": "Image Changed",
+      "id": "isLocalStorage",
+      "type": "Boolean",
+      "name": "Local storage"
+    },
+    {
+      "id": "startDelay",
+      "name": "Start session delay (ms)",
       "locale_name": {
-        "fr_FR": "Image Changée"
-      }
+        "fr_FR": "Délai de démarrage de session (ms)"
+      },
+      "type": "Integer",
+      "value": 1000
     }
   ],
 
   "actions": [
     {
-      "id": "changeColor",
-      "name": "Change Color",
+      "id": "start",
+      "name": "Start the session",
+      "locale_name": {
+        "fr_FR": "Commencer la session"
+      }
+    },
+    {
+      "id": "incomplete",
+      "name": "Set session as incomplete",
+      "locale_name": {
+        "fr_FR": "Définir la session comme incomplète"
+      }
+    },
+    {
+      "id": "complete",
+      "name": "Set session as complete",
+      "locale_name": {
+        "fr_FR": "Définir la session comme terminée"
+      }
+    },
+    {
+      "id": "timedout",
+      "name": "Set session as timed out",
+      "locale_name": {
+        "fr_FR": "Définir la session comme expirée"
+      }
+    },
+    {
+      "id": "progress",
+      "name": "Set progression",
+      "locale_name": {
+        "fr_FR": "Définir la progression"
+      },
       "params": [
         {
-          "id": "backgroundColor",
-          "name": "Background Color",
-          "locale_name": {
-            "fr_FR": "Couleur de fond"
-          },
-          "type": "String",
-          "value": "#FFFFFF"
+          "id": "value",
+          "name": "Progress",
+          "type": "Float",
+          "value": 0
+        }
+      ]
+    },        
+    {
+      "id": "score",
+      "name": "Set score",
+      "locale_name": {
+        "fr_FR": "Définir le score"
+      },
+      "params": [
+        {
+          "id": "value",
+          "name": "Score",
+          "type": "Integer",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "id": "incScore",
+      "name": "Increment score",
+      "locale_name": {
+        "fr_FR": "Incrémenter le score"
+      },
+      "params": [
+        {
+          "id": "value",
+          "name": "Score",
+          "type": "Integer",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "id": "decScore",
+      "name": "Decrement score",
+      "locale_name": {
+        "fr_FR": "Décrementer le score"
+      },
+      "params": [
+        {
+          "id": "value",
+          "name": "Score",
+          "type": "Integer",
+          "value": 0
         }
       ]
     }
@@ -76,19 +139,18 @@
 
   "synchronization": [
     {
-      "id": "synchroImages",
-      "name": "Synchronize images",
+      "id": "syncProgress",
+      "name": "Synchronize progression",
       "locale_name": {
-        "fr_FR": "Synchroniser images"
+        "fr_FR": "Synchroniser progression"
       }
-    }
-  ],
-
-  "resources": [
+    },
     {
-      "id": "my_image.png",
-      "type": "Image",
-      "localization": false
+      "id": "syncScore",
+      "name": "Synchronize score",
+      "locale_name": {
+        "fr_FR": "Synchroniser score "
+      }
     }
   ]
 }
