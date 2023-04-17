@@ -6,7 +6,7 @@
   "private": true,
   "scripts": {
     "start": "webpack-dev-server --open",
-    "build": "webpack --mode production --devtool none && cd build && zip -r -X '../pandasuite-component.zip' *",
+    "build": "rm -f ./pandasuite-component.zip && webpack --mode production --devtool none && cd build && zip -r -X '../pandasuite-component.zip' *",
     "release": "yarn build && release-it --no-npm.publish"
   },
   "devDependencies": {
@@ -21,7 +21,7 @@
     "webpack-dev-server": "^3.11.0"
   },
   "dependencies": {
-    "pandasuite-bridge": "^4.2.1"
+    "pandasuite-bridge": "^4.5.0"
   },
   "release-it": {
     "github": {
