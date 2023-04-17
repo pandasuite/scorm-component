@@ -1,6 +1,6 @@
 {
   "name": "scorm-component",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "main": "index.js",
   "repository": "https://github.com/pandasuite/scorm-component.git",
   "private": true,
