@@ -126,6 +126,11 @@ function discoverScormAPI() {
 }
 
 function setScormProgress(progress) {
+  const {
+    isLocalStorage,
+    [PandaBridge.UNIQUE_ID]: unitId,
+  } = properties;
+
   const tt = (new Date()).getTime() - startTime;
   // eslint-disable-next-line no-console
   console.log('scorm progress', tt, startTime, millisecondsToTime2004(tt));
@@ -144,14 +149,21 @@ function setScormProgress(progress) {
     API_2004.SetValue('cmi.progress_measure', progress);
     API_2004.Commit('');
   }
-  if (properties.isLocalStorage) {
-    localStorage.setItem(`${properties.id}_total_time`, tt);
-    localStorage.setItem(`${properties.id}_progress`, progress);
+  if (isLocalStorage) {
+    localStorage.setItem(`${unitId}_total_time`, tt);
+    localStorage.setItem(`${unitId}_progress`, progress);
     PandaBridge.send('synchronize', [progress, 'syncProgress', true]);
   }
 }
 
 function setScormScore(score) {
+  const {
+    isLocalStorage,
+    [PandaBridge.UNIQUE_ID]: unitId,
+    'score-min': scoreMin,
+    'score-max': scoreMax,
+  } = properties;
+
   const tt = (new Date()).getTime() - startTime;
   // eslint-disable-next-line no-console
   console.log('scorm score', tt, startTime, millisecondsToTime2004(tt));
@@ -168,14 +180,14 @@ function setScormScore(score) {
     API_2004.SetValue('cmi.session_time', timefull);
 
     API_2004.SetValue('cmi.score.raw', score);
-    API_2004.SetValue('cmi.score.scaled', score / parseInt(properties['score.max']));
+    API_2004.SetValue('cmi.score.scaled', score / parseInt(scoreMax));
     API_2004.Commit('');
   }
-  if (properties.isLocalStorage) {
-    localStorage.setItem(`${properties.id}_total_time`, tt);
-    localStorage.setItem(`${properties.id}_score`, score);
+  if (isLocalStorage) {
+    localStorage.setItem(`${unitId}_total_time`, tt);
+    localStorage.setItem(`${unitId}_score`, score);
     PandaBridge.send('synchronize', [
-      (score * 100) / (properties['score.max'] - properties['score.min']),
+      (score * 100) / (scoreMax - scoreMin),
       'syncScore',
       true,
     ]);
@@ -183,17 +195,22 @@ function setScormScore(score) {
 }
 
 function reloadState() {
-  if (properties.isLocalStorage) {
-    const progress = localStorage.getItem(`${properties.id}_progress`);
+  const {
+    isLocalStorage,
+    [PandaBridge.UNIQUE_ID]: unitId,
+  } = properties;
+
+  if (isLocalStorage) {
+    const progress = localStorage.getItem(`${unitId}_progress`);
     if (progress != null) {
       setScormProgress(parseFloat(progress));
     }
-    const score = localStorage.getItem(`${properties.id}_score`);
+    const score = localStorage.getItem(`${unitId}_score`);
     if (score != null) {
       currentScore = parseFloat(score);
       setScormScore(currentScore);
     }
-    const tt = localStorage.getItem(`${properties.id}_total_time`);
+    const tt = localStorage.getItem(`${unitId}_total_time`);
     if (tt != null) {
       startTime = (new Date()).getTime() - parseInt(tt);
     }
@@ -204,19 +221,24 @@ function reloadState() {
 }
 
 function startSession() {
+  const {
+    'score-min': scoreMin,
+    'score-max': scoreMax,
+  } = properties;
+
   reloadState();
 
   if (API_11_12 && API_11_12.LMSInitialize) {
     API_11_12.LMSInitialize('');
     API_11_12.LMSSetValue('cmi.core.lesson_status', 'browsed');
-    API_11_12.LMSSetValue('cmi.core.score.min', properties['score.min']);
-    API_11_12.LMSSetValue('cmi.core.score.max', properties['score.max']);
+    API_11_12.LMSSetValue('cmi.core.score.min', scoreMin);
+    API_11_12.LMSSetValue('cmi.core.score.max', scoreMax);
     API_11_12.LMSCommit('');
   }
   if (API_2004 && API_2004.Initialize) {
     API_2004.Initialize('');
-    API_2004.SetValue('cmi.score.min', properties['score.min']);
-    API_2004.SetValue('cmi.score.max', properties['score.max']);
+    API_2004.SetValue('cmi.score.min', scoreMin);
+    API_2004.SetValue('cmi.score.max', scoreMax);
     API_2004.Commit('');
   }
 }
@@ -246,6 +268,11 @@ PandaBridge.init(() => {
   });
 
   PandaBridge.listen('incomplete', () => {
+    const {
+      isLocalStorage,
+      [PandaBridge.UNIQUE_ID]: unitId,
+    } = properties;
+
     const tt = (new Date()).getTime() - startTime;
 
     if (API_11_12 && API_11_12.LMSSetValue) {
@@ -260,12 +287,17 @@ PandaBridge.init(() => {
       API_2004.SetValue('cmi.session_time', timefull);
       API_2004.Commit('');
     }
-    if (properties.isLocalStorage) {
-      localStorage.setItem(`${properties.id}_total_time`, tt);
+    if (isLocalStorage) {
+      localStorage.setItem(`${unitId}_total_time`, tt);
     }
   });
 
   PandaBridge.listen('complete', () => {
+    const {
+      isLocalStorage,
+      [PandaBridge.UNIQUE_ID]: unitId,
+    } = properties;
+
     const tt = (new Date()).getTime() - startTime;
 
     if (API_11_12 && API_11_12.LMSSetValue) {
@@ -282,8 +314,8 @@ PandaBridge.init(() => {
       API_2004.Commit('');
       API_2004.Terminate('');
     }
-    if (properties.isLocalStorage) {
-      localStorage.setItem(`${properties.id}_total_time`, tt);
+    if (isLocalStorage) {
+      localStorage.setItem(`${unitId}_total_time`, tt);
     }
   });
 

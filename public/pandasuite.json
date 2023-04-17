@@ -22,27 +22,13 @@
       "value": 100
     },
     {
-      "id": "id",
-      "name": "Identifier",
-      "locale_name": {
-        "fr_FR": "Identifiant"
-      },
-      "type": "String",
-      "value": "scorm"
-    },
-    {
       "id": "isLocalStorage",
       "type": "Boolean",
-      "name": "Local storage"
-    },
-    {
-      "id": "startDelay",
-      "name": "Start session delay (ms)",
+      "name": "Persistence",
       "locale_name": {
-        "fr_FR": "Délai de démarrage de session (ms)"
+        "fr_FR": "Persistance"
       },
-      "type": "Integer",
-      "value": 1000
+      "separator": true
     }
   ],
 
