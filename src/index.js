@@ -6,11 +6,20 @@ import {
   DEBUG_STORAGE_KEY,
   isDebugLoggingEnabled,
 } from './logging';
+import { selectProtocol } from './runtime/select-protocol';
 
 let properties = null;
 
 let API_2004 = null;
 let API_11_12 = null;
+let runtimeSelection = {
+  protocol: 'local',
+  context: {
+    cmi5: null,
+    hasScorm2004: false,
+    hasScorm12: false,
+  },
+};
 
 let startTime = null;
 let currentScore = 0;
@@ -41,6 +50,7 @@ const logger = createLogger({
 });
 
 let lastApiStateSignature = null;
+let lastRuntimeSelectionSignature = null;
 
 function logDebug(message, details) {
   logger.debug(message, details);
@@ -59,12 +69,20 @@ function logError(message, details) {
 }
 
 function getActiveProtocol() {
-  if (API_11_12) {
+  if (runtimeSelection.protocol === 'cmi5') {
+    return 'CMI5';
+  }
+
+  if (runtimeSelection.protocol === 'scorm2004' || API_2004) {
+    return 'SCORM 2004';
+  }
+
+  if (runtimeSelection.protocol === 'scorm12' || API_11_12) {
     return 'SCORM 1.2';
   }
 
-  if (API_2004) {
-    return 'SCORM 2004';
+  if (runtimeSelection.protocol === 'local') {
+    return 'Local';
   }
 
   return null;
@@ -144,6 +162,10 @@ function logApiState() {
   lastApiStateSignature = signature;
 
   if (signature === 'missing') {
+    if (runtimeSelection.protocol === 'cmi5') {
+      return;
+    }
+
     logError('No SCORM API available after discovery', {
       currentWindow: getWindowDebugInfo(window, 'ensureScormAPI'),
       referrer: document.referrer,
@@ -158,6 +180,28 @@ function logApiState() {
     protocol: getActiveProtocol(),
     scorm12: !!API_11_12,
     scorm2004: !!API_2004,
+  });
+}
+
+function logRuntimeSelection() {
+  const signature = [
+    runtimeSelection.protocol,
+    runtimeSelection.context.hasScorm2004,
+    runtimeSelection.context.hasScorm12,
+    runtimeSelection.context.cmi5 != null,
+  ].join(':');
+
+  if (signature === lastRuntimeSelectionSignature) {
+    return;
+  }
+
+  lastRuntimeSelectionSignature = signature;
+
+  logInfo('Protocol selected', {
+    protocol: getActiveProtocol(),
+    hasScorm2004: runtimeSelection.context.hasScorm2004,
+    hasScorm12: runtimeSelection.context.hasScorm12,
+    hasCmi5LaunchContext: runtimeSelection.context.cmi5 != null,
   });
 }
 
@@ -419,6 +463,12 @@ function millisecondsToTime2004(seconds) {
 function discoverScormAPI() {
   API_2004 = discoverScormAPI2004();
   API_11_12 = discoverScormAPI1112();
+  runtimeSelection = selectProtocol({
+    queryString: window.location && window.location.search,
+    hasScorm2004: !!API_2004,
+    hasScorm12: !!API_11_12,
+  });
+  logRuntimeSelection();
   logApiState();
 }
 
