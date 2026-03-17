@@ -292,10 +292,18 @@ export function createTracker({
       return outcome.ok;
     },
     async incScore(value) {
+      if (!ensureSessionStarted('incScore')) {
+        return false;
+      }
+
       currentScore += normalizeScore(value);
       return this.score(currentScore);
     },
     async decScore(value) {
+      if (!ensureSessionStarted('decScore')) {
+        return false;
+      }
+
       currentScore -= normalizeScore(value);
       return this.score(currentScore);
     },

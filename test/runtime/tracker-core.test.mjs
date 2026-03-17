@@ -111,6 +111,21 @@ test('score after start delegates normalized values', async () => {
   assert.equal(adapter.calls.setScore[0].elapsedMs, 5000);
 });
 
+test('incScore and decScore before start do not mutate score state', async () => {
+  const tracker = createTracker({
+    adapter: createAdapter(),
+    properties: {
+      'score.min': 0,
+      'score.max': 100,
+    },
+    logger: createLogger(),
+  });
+
+  assert.equal(await tracker.incScore(5), false);
+  assert.equal(await tracker.decScore(2), false);
+  assert.equal(tracker.getState().currentScore, 0);
+});
+
 test('complete keeps session open when adapter complete fails', async () => {
   const adapter = createAdapter({
     complete(payload) {
