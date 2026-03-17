@@ -22,6 +22,20 @@ function createNoopLogger(logger = {}) {
   };
 }
 
+function normalizeActionResult(result) {
+  if (result && typeof result === 'object') {
+    return {
+      ok: result.ok === true,
+      ignored: result.ignored === true,
+    };
+  }
+
+  return {
+    ok: result === true,
+    ignored: false,
+  };
+}
+
 export function createTracker({
   adapter = null,
   companionAdapters = [],
@@ -66,26 +80,32 @@ export function createTracker({
     };
   }
 
-  function runCompanionAdapters(methodName, payload) {
-    companionAdapters.forEach((companionAdapter) => {
+  async function runCompanionAdapters(methodName, payload) {
+    await Promise.all(companionAdapters.map((companionAdapter) => {
       if (!companionAdapter || typeof companionAdapter[methodName] !== 'function') {
-        return;
+        return null;
       }
 
-      companionAdapter[methodName](payload);
-    });
+      return companionAdapter[methodName](payload);
+    }));
   }
 
-  function restoreState() {
+  async function restoreState() {
     const adapters = [adapter, ...companionAdapters];
     const restored = {};
 
-    adapters.forEach((currentAdapter) => {
+    const restoredStates = await Promise.all(adapters.map((currentAdapter) => {
       if (!currentAdapter || typeof currentAdapter.restore !== 'function') {
-        return;
+        return null;
       }
 
-      const nextState = currentAdapter.restore() || {};
+      return currentAdapter.restore();
+    }));
+
+    restoredStates.forEach((nextState) => {
+      if (!nextState) {
+        return;
+      }
 
       if (restored.elapsedMs == null && nextState.elapsedMs != null) {
         restored.elapsedMs = nextState.elapsedMs;
@@ -131,7 +151,7 @@ export function createTracker({
 
   return {
     getState,
-    start() {
+    async start() {
       const {
         scoreMin,
         scoreMax,
@@ -156,10 +176,10 @@ export function createTracker({
         return true;
       }
 
-      const restored = restoreState();
+      const restored = await restoreState();
       startTime = restored.elapsedMs == null ? getNow() : getNow() - restored.elapsedMs;
 
-      const didStart = adapter.start(getBasePayload());
+      const { ok: didStart } = normalizeActionResult(await adapter.start(getBasePayload()));
       if (!didStart) {
         runtimeLogger.error('Session start failed', {
           protocol: getProtocol(),
@@ -173,12 +193,12 @@ export function createTracker({
       sessionFinished = false;
 
       if (restored.progressPercent != null) {
-        this.progress(restored.progressPercent);
+        await this.progress(restored.progressPercent);
       }
 
       if (restored.score != null) {
         currentScore = normalizeScore(restored.score);
-        this.score(currentScore);
+        await this.score(currentScore);
       }
 
       runtimeLogger.info('Session started', {
@@ -191,7 +211,7 @@ export function createTracker({
       });
       return true;
     },
-    progress(value) {
+    async progress(value) {
       const progressPercent = normalizeProgressPercent(value);
       const progressRatio = progressPercent / 100;
 
@@ -203,13 +223,17 @@ export function createTracker({
         progressPercent,
         progressRatio,
       });
-      const didSync = adapter && typeof adapter.setProgress === 'function'
-        ? adapter.setProgress(payload)
-        : false;
+      const outcome = adapter && typeof adapter.setProgress === 'function'
+        ? normalizeActionResult(await adapter.setProgress(payload))
+        : normalizeActionResult(false);
 
-      runCompanionAdapters('setProgress', payload);
+      await runCompanionAdapters('setProgress', payload);
 
-      if (didSync) {
+      if (outcome.ignored) {
+        return outcome.ok;
+      }
+
+      if (outcome.ok) {
         runtimeLogger.info('Progress synced', {
           protocol: getProtocol(),
           progressPercent,
@@ -225,9 +249,9 @@ export function createTracker({
         });
       }
 
-      return didSync;
+      return outcome.ok;
     },
-    score(value) {
+    async score(value) {
       currentScore = normalizeScore(value);
 
       if (!ensureSessionStarted('score')) {
@@ -237,13 +261,17 @@ export function createTracker({
       const payload = getBasePayload({
         score: currentScore,
       });
-      const didSync = adapter && typeof adapter.setScore === 'function'
-        ? adapter.setScore(payload)
-        : false;
+      const outcome = adapter && typeof adapter.setScore === 'function'
+        ? normalizeActionResult(await adapter.setScore(payload))
+        : normalizeActionResult(false);
 
-      runCompanionAdapters('setScore', payload);
+      await runCompanionAdapters('setScore', payload);
 
-      if (didSync) {
+      if (outcome.ignored) {
+        return outcome.ok;
+      }
+
+      if (outcome.ok) {
         runtimeLogger.info('Score synced', {
           protocol: getProtocol(),
           score: currentScore,
@@ -261,29 +289,33 @@ export function createTracker({
         });
       }
 
-      return didSync;
+      return outcome.ok;
     },
-    incScore(value) {
+    async incScore(value) {
       currentScore += normalizeScore(value);
       return this.score(currentScore);
     },
-    decScore(value) {
+    async decScore(value) {
       currentScore -= normalizeScore(value);
       return this.score(currentScore);
     },
-    incomplete() {
+    async incomplete() {
       if (!ensureSessionStarted('incomplete')) {
         return false;
       }
 
       const payload = getBasePayload();
-      const didSync = adapter && typeof adapter.markIncomplete === 'function'
-        ? adapter.markIncomplete(payload)
-        : false;
+      const outcome = adapter && typeof adapter.markIncomplete === 'function'
+        ? normalizeActionResult(await adapter.markIncomplete(payload))
+        : normalizeActionResult(false);
 
-      runCompanionAdapters('markIncomplete', payload);
+      await runCompanionAdapters('markIncomplete', payload);
 
-      if (didSync) {
+      if (outcome.ignored) {
+        return outcome.ok;
+      }
+
+      if (outcome.ok) {
         runtimeLogger.info('Session marked incomplete', {
           protocol: getProtocol(),
           elapsedMs: payload.elapsedMs,
@@ -295,20 +327,20 @@ export function createTracker({
         });
       }
 
-      return didSync;
+      return outcome.ok;
     },
-    complete() {
+    async complete() {
       if (!ensureSessionStarted('complete')) {
         return false;
       }
 
       const payload = getBasePayload();
-      const didComplete = adapter && typeof adapter.complete === 'function'
-        ? adapter.complete(payload)
-        : false;
+      const { ok: didComplete } = adapter && typeof adapter.complete === 'function'
+        ? normalizeActionResult(await adapter.complete(payload))
+        : normalizeActionResult(false);
 
       if (didComplete) {
-        runCompanionAdapters('complete', payload);
+        await runCompanionAdapters('complete', payload);
         sessionStarted = false;
         sessionFinished = true;
         runtimeLogger.info('Session completed', {
@@ -324,18 +356,18 @@ export function createTracker({
       });
       return false;
     },
-    timedout() {
+    async timedout() {
       if (!ensureSessionStarted('timedout')) {
         return false;
       }
 
       const payload = getBasePayload();
-      const didTimeout = adapter && typeof adapter.timeout === 'function'
-        ? adapter.timeout(payload)
-        : false;
+      const { ok: didTimeout } = adapter && typeof adapter.timeout === 'function'
+        ? normalizeActionResult(await adapter.timeout(payload))
+        : normalizeActionResult(false);
 
       if (didTimeout) {
-        runCompanionAdapters('timeout', payload);
+        await runCompanionAdapters('timeout', payload);
         sessionStarted = false;
         sessionFinished = true;
         runtimeLogger.warn('Session timed out', {

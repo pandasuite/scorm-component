@@ -7,6 +7,7 @@ import {
   isDebugLoggingEnabled,
 } from './logging';
 import { createLocalAdapter } from './runtime/adapters/local';
+import { createCmi5Adapter } from './runtime/adapters/cmi5';
 import { createScorm12Adapter } from './runtime/adapters/scorm12';
 import { createScorm2004Adapter } from './runtime/adapters/scorm2004';
 import { selectProtocol } from './runtime/select-protocol';
@@ -388,6 +389,12 @@ function createRuntimeTracker() {
       api: API_2004,
       logger: runtimeLogger,
     });
+  } else if (runtimeSelection.protocol === 'cmi5' && runtimeSelection.context.cmi5) {
+    adapter = createCmi5Adapter({
+      launchContext: runtimeSelection.context.cmi5,
+      fetchFn: (...args) => window.fetch(...args),
+      logger: runtimeLogger,
+    });
   } else if (runtimeSelection.protocol === 'scorm12' && API_11_12) {
     adapter = createScorm12Adapter({
       api: API_11_12,
@@ -402,7 +409,7 @@ function createRuntimeTracker() {
     });
   }
 
-  if (adapter == null && isLocalStorage) {
+  if (runtimeSelection.protocol !== 'local' && isLocalStorage) {
     companionAdapters.push(createLocalAdapter({
       enabled: true,
       unitId,
@@ -419,7 +426,20 @@ function createRuntimeTracker() {
   });
 }
 
+function refreshRuntimeTracker() {
+  const currentState = tracker ? tracker.getState() : null;
+
+  if (currentState && (currentState.sessionStarted || currentState.sessionFinished)) {
+    return;
+  }
+
+  ensureScormAPI();
+  tracker = createRuntimeTracker();
+}
+
 function getTracker(actionName) {
+  refreshRuntimeTracker();
+
   if (tracker) {
     return tracker;
   }
@@ -431,6 +451,17 @@ function getTracker(actionName) {
   return null;
 }
 
+function runTrackerAction(actionName, handler) {
+  const activeTracker = getTracker(actionName);
+  if (!activeTracker) {
+    return;
+  }
+
+  Promise.resolve(handler(activeTracker)).catch((error) => {
+    logError(`Unexpected error during "${actionName}"`, formatError(error));
+  });
+}
+
 PandaBridge.init(() => {
   PandaBridge.onLoad((pandaData) => {
     properties = pandaData.properties;
@@ -440,62 +471,38 @@ PandaBridge.init(() => {
   });
 
   PandaBridge.listen('start', () => {
-    const activeTracker = getTracker('start');
-    if (activeTracker) {
-      activeTracker.start();
-    }
+    runTrackerAction('start', (activeTracker) => activeTracker.start());
   });
 
   PandaBridge.listen('incomplete', () => {
-    const activeTracker = getTracker('incomplete');
-    if (activeTracker) {
-      activeTracker.incomplete();
-    }
+    runTrackerAction('incomplete', (activeTracker) => activeTracker.incomplete());
   });
 
   PandaBridge.listen('complete', () => {
-    const activeTracker = getTracker('complete');
-    if (activeTracker) {
-      activeTracker.complete();
-    }
+    runTrackerAction('complete', (activeTracker) => activeTracker.complete());
   });
 
   PandaBridge.listen('timedout', () => {
-    const activeTracker = getTracker('timedout');
-    if (activeTracker) {
-      activeTracker.timedout();
-    }
+    runTrackerAction('timedout', (activeTracker) => activeTracker.timedout());
   });
 
   PandaBridge.listen('progress', (args) => {
     const props = args[0] || {};
-    const activeTracker = getTracker('progress');
-    if (activeTracker) {
-      activeTracker.progress(parseFloat(props.value || 0));
-    }
+    runTrackerAction('progress', (activeTracker) => activeTracker.progress(parseFloat(props.value || 0)));
   });
 
   PandaBridge.listen('score', (args) => {
     const props = args[0] || {};
-    const activeTracker = getTracker('score');
-    if (activeTracker) {
-      activeTracker.score(parseInt(props.value || 0));
-    }
+    runTrackerAction('score', (activeTracker) => activeTracker.score(parseInt(props.value || 0)));
   });
 
   PandaBridge.listen('incScore', (args) => {
     const props = args[0] || {};
-    const activeTracker = getTracker('incScore');
-    if (activeTracker) {
-      activeTracker.incScore(parseInt(props.value || 0));
-    }
+    runTrackerAction('incScore', (activeTracker) => activeTracker.incScore(parseInt(props.value || 0)));
   });
 
   PandaBridge.listen('decScore', (args) => {
     const props = args[0] || {};
-    const activeTracker = getTracker('decScore');
-    if (activeTracker) {
-      activeTracker.decScore(parseInt(props.value || 0));
-    }
+    runTrackerAction('decScore', (activeTracker) => activeTracker.decScore(parseInt(props.value || 0)));
   });
 });
