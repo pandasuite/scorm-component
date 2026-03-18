@@ -329,11 +329,72 @@ function discoverScormAPI1112() {
   return api1112;
 }
 
+function appendUniqueQueryStringCandidate(candidates, value) {
+  if (typeof value !== 'string' || value.length === 0) {
+    return;
+  }
+
+  if (!candidates.includes(value)) {
+    candidates.push(value);
+  }
+}
+
+function getQueryStringFromUrl(url) {
+  if (typeof url !== 'string' || url.length === 0) {
+    return '';
+  }
+
+  try {
+    return new URL(url, window.location.href).search || '';
+  } catch (error) {
+    return '';
+  }
+}
+
+function appendWindowQueryStringCandidate(candidates, targetWindow) {
+  if (targetWindow == null) {
+    return;
+  }
+
+  try {
+    const queryString = targetWindow.location && targetWindow.location.search;
+    appendUniqueQueryStringCandidate(candidates, queryString);
+  } catch (error) {
+    logDebug('Unable to read launch query string from window', formatError(error));
+  }
+}
+
+function getLaunchQueryStringCandidates() {
+  const candidates = [];
+
+  appendWindowQueryStringCandidate(candidates, window);
+
+  if (window.parent && window.parent !== window) {
+    appendWindowQueryStringCandidate(candidates, window.parent);
+  }
+
+  if (window.top && window.top !== window) {
+    appendWindowQueryStringCandidate(candidates, window.top);
+  }
+
+  if (window.opener) {
+    appendWindowQueryStringCandidate(candidates, window.opener);
+  }
+
+  if (document.referrer) {
+    appendUniqueQueryStringCandidate(candidates, getQueryStringFromUrl(document.referrer));
+  }
+
+  return candidates;
+}
+
 function discoverScormAPI() {
+  const queryStrings = getLaunchQueryStringCandidates();
   API_2004 = discoverScormAPI2004();
   API_11_12 = discoverScormAPI1112();
   runtimeSelection = selectProtocol({
-    queryString: window.location && window.location.search,
+    queryString: queryStrings[0],
+    queryStrings,
     hasScorm2004: !!API_2004,
     hasScorm12: !!API_11_12,
   });

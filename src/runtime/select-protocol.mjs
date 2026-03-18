@@ -5,19 +5,38 @@ const REQUIRED_CMI5_PARAMS = [
   'actor',
 ];
 
-function getQueryString({
+function appendQueryStringCandidate(candidates, value) {
+  if (typeof value !== 'string' || value.length === 0) {
+    return;
+  }
+
+  if (!candidates.includes(value)) {
+    candidates.push(value);
+  }
+}
+
+function getQueryStrings({
   queryString = '',
+  queryStrings = [],
   locationSearch = '',
 } = {}) {
-  if (typeof queryString === 'string' && queryString.length > 0) {
-    return queryString;
+  const candidates = [];
+
+  appendQueryStringCandidate(candidates, queryString);
+
+  if (Array.isArray(queryStrings)) {
+    queryStrings.forEach((candidate) => {
+      appendQueryStringCandidate(candidates, candidate);
+    });
   }
 
-  if (typeof locationSearch === 'string' && locationSearch.length > 0) {
-    return locationSearch;
+  appendQueryStringCandidate(candidates, locationSearch);
+
+  if (candidates.length > 0) {
+    return candidates;
   }
 
-  return '';
+  return [''];
 }
 
 function hasValue(value) {
@@ -71,10 +90,15 @@ export function parseCmi5LaunchContext(queryString = '') {
 }
 
 export function selectProtocol(options = {}) {
-  const queryString = getQueryString(options);
+  const queryStrings = getQueryStrings(options);
   const hasScorm2004 = options.hasScorm2004 === true || !!options.scorm2004Api;
   const hasScorm12 = options.hasScorm12 === true || !!options.scorm12Api;
-  const cmi5 = parseCmi5LaunchContext(queryString);
+  let cmi5 = null;
+
+  queryStrings.some((queryString) => {
+    cmi5 = parseCmi5LaunchContext(queryString);
+    return cmi5 != null;
+  });
 
   if (cmi5 != null) {
     return {

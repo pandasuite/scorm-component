@@ -66,6 +66,24 @@ test('selectProtocol still accepts legacy lowercase activityid launch params', (
   assert.equal(result.context.cmi5.activityid, 'act-legacy');
 });
 
+test('selectProtocol detects cmi5 from fallback query string candidates', () => {
+  const { queryString } = buildCmi5QueryString();
+
+  const result = selectProtocol({
+    queryString: '',
+    queryStrings: [
+      '',
+      '?foo=bar',
+      queryString,
+    ],
+    hasScorm2004: false,
+    hasScorm12: false,
+  });
+
+  assert.equal(result.protocol, 'cmi5');
+  assert.equal(result.context.cmi5.activityId, 'act-456');
+});
+
 test('selectProtocol falls back to scorm2004 when cmi5 params are incomplete', () => {
   const { queryString } = buildCmi5QueryString({
     actor: null,
