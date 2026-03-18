@@ -4,7 +4,15 @@ const XAPI_VERSION = '1.0.3';
 const LAUNCH_DATA_STATE_ID = 'LMS.LaunchData';
 const LEARNER_PREFERENCES_PROFILE_ID = 'cmi5LearnerPreferences';
 const PROGRESS_EXTENSION_ID = 'https://w3id.org/xapi/cmi5/result/extensions/progress';
-const MASTERY_SCORE_EXTENSION_ID = 'https://w3id.org/xapi/cmi5/context/extensions/masteryscore';
+const CMI5_CATEGORY_ID = 'https://w3id.org/xapi/cmi5/context/categories/cmi5';
+const MOVEON_CATEGORY_ID = 'https://w3id.org/xapi/cmi5/context/categories/moveon';
+
+const MOVE_ON = {
+  Completed: 'Completed',
+  Passed: 'Passed',
+  CompletedAndPassed: 'CompletedAndPassed',
+  CompletedOrPassed: 'CompletedOrPassed',
+};
 
 const VERBS = {
   initialized: {
@@ -127,6 +135,30 @@ function createNoopLogger(logger = {}) {
   };
 }
 
+function ensureCategoryActivity(context, categoryId) {
+  if (!categoryId) {
+    return;
+  }
+
+  if (!context.contextActivities) {
+    context.contextActivities = {};
+  }
+
+  if (!Array.isArray(context.contextActivities.category)) {
+    context.contextActivities.category = [];
+  }
+
+  const hasCategory = context.contextActivities.category.some(
+    (activity) => activity && activity.id === categoryId,
+  );
+  if (!hasCategory) {
+    context.contextActivities.category.push({
+      objectType: 'Activity',
+      id: categoryId,
+    });
+  }
+}
+
 export function createCmi5Adapter({
   launchContext,
   fetchFn = (...args) => fetch(...args),
@@ -143,6 +175,7 @@ export function createCmi5Adapter({
   let initialized = false;
   let terminated = false;
   let latestScore = null;
+  let resolvedMoveOn = null;
 
   function getActorString() {
     if (typeof launchContext.actor === 'string' && launchContext.actor.length > 0) {
@@ -258,21 +291,44 @@ export function createCmi5Adapter({
     return bootPromise;
   }
 
+  function getMoveOn() {
+    if (resolvedMoveOn != null) {
+      return resolvedMoveOn;
+    }
+
+    switch (launchData && launchData.moveOn) {
+      case MOVE_ON.Passed:
+      case MOVE_ON.CompletedAndPassed:
+      case MOVE_ON.CompletedOrPassed:
+      case MOVE_ON.Completed:
+        resolvedMoveOn = launchData.moveOn;
+        break;
+      default:
+        runtimeLogger.warn('Unknown CMI5 moveOn, falling back to Completed', {
+          moveOn: launchData && launchData.moveOn,
+        });
+        resolvedMoveOn = MOVE_ON.Completed;
+        break;
+    }
+
+    return resolvedMoveOn;
+  }
+
   function buildContext({
-    includeMasteryScore = false,
+    includeCmi5Category = false,
+    includeMoveOnCategory = false,
   } = {}) {
     const context = cloneJson(launchData.contextTemplate);
-    const extensions = context.extensions || {};
 
     context.registration = launchContext.registration;
-    context.extensions = extensions;
+    context.extensions = context.extensions || {};
 
-    if (
-      includeMasteryScore
-      && launchData.masteryScore != null
-      && context.extensions[MASTERY_SCORE_EXTENSION_ID] == null
-    ) {
-      context.extensions[MASTERY_SCORE_EXTENSION_ID] = launchData.masteryScore;
+    if (includeCmi5Category) {
+      ensureCategoryActivity(context, CMI5_CATEGORY_ID);
+    }
+
+    if (includeMoveOnCategory) {
+      ensureCategoryActivity(context, MOVEON_CATEGORY_ID);
     }
 
     return context;
@@ -281,7 +337,8 @@ export function createCmi5Adapter({
   function buildStatement({
     verb,
     result = null,
-    includeMasteryScore = false,
+    includeCmi5Category = false,
+    includeMoveOnCategory = false,
   }) {
     return {
       id: createStatementId(),
@@ -297,7 +354,8 @@ export function createCmi5Adapter({
         objectType: 'Activity',
       },
       context: buildContext({
-        includeMasteryScore,
+        includeCmi5Category,
+        includeMoveOnCategory,
       }),
       timestamp: new Date(getNow()).toISOString(),
       ...(result ? { result } : {}),
@@ -307,12 +365,14 @@ export function createCmi5Adapter({
   async function postStatement({
     verb,
     result = null,
-    includeMasteryScore = false,
+    includeCmi5Category = false,
+    includeMoveOnCategory = false,
   }) {
     const statement = buildStatement({
       verb,
       result,
-      includeMasteryScore,
+      includeCmi5Category,
+      includeMoveOnCategory,
     });
     const response = await fetchFn(buildUrl(launchContext.endpoint, 'statements'), {
       method: 'POST',
@@ -362,12 +422,67 @@ export function createCmi5Adapter({
     };
   }
 
+  function getSuccessEvaluation(payload = {}) {
+    const score = latestScore || buildLatestScore(payload);
+    const masteryScore = normalizeNumber(launchData.masteryScore);
+
+    if (!score || masteryScore == null) {
+      return null;
+    }
+
+    return {
+      score,
+      passed: score.scaled >= masteryScore,
+    };
+  }
+
+  async function postCmi5DefinedStatement({
+    verb,
+    result = null,
+    includeMoveOnCategory = false,
+  }) {
+    return postStatement({
+      verb,
+      result,
+      includeCmi5Category: true,
+      includeMoveOnCategory,
+    });
+  }
+
+  async function postPassFailStatement(successEvaluation, elapsedMs) {
+    return postCmi5DefinedStatement({
+      verb: successEvaluation.passed ? VERBS.passed : VERBS.failed,
+      includeMoveOnCategory: true,
+      result: {
+        score: {
+          raw: successEvaluation.score.raw,
+          min: successEvaluation.score.min,
+          max: successEvaluation.score.max,
+          scaled: successEvaluation.score.scaled,
+        },
+        success: successEvaluation.passed,
+        ...createDurationResult(elapsedMs),
+      },
+    });
+  }
+
+  async function postCompletedStatement(elapsedMs) {
+    return postCmi5DefinedStatement({
+      verb: VERBS.completed,
+      includeMoveOnCategory: true,
+      result: {
+        completion: true,
+        ...createDurationResult(elapsedMs),
+      },
+    });
+  }
+
   async function terminate(elapsedMs) {
     if (terminated) {
       return true;
     }
 
-    await postStatement({
+    await postCmi5DefinedStatement({
       verb: VERBS.terminated,
       result: createDurationResult(elapsedMs),
     });
@@ -404,6 +519,7 @@ export function createCmi5Adapter({
 
       await postStatement({
         verb: VERBS.initialized,
+        includeCmi5Category: true,
       });
       initialized = true;
       return true;
@@ -495,37 +611,32 @@ export function createCmi5Adapter({
         return terminate(payload.elapsedMs);
       }
 
-      await postStatement({
-        verb: VERBS.completed,
-        result: {
-          completion: true,
-          ...createDurationResult(payload.elapsedMs),
-        },
-      });
+      const moveOn = getMoveOn();
+      const successEvaluation = getSuccessEvaluation(payload);
 
-      const score = latestScore || buildLatestScore(payload);
-      if (score && launchData.masteryScore != null) {
-        const passed = score.scaled >= launchData.masteryScore;
-
-        await postStatement({
-          verb: passed ? VERBS.passed : VERBS.failed,
-          includeMasteryScore: true,
-          result: {
-            score: {
-              raw: score.raw,
-              min: score.min,
-              max: score.max,
-              scaled: score.scaled,
-            },
-            success: passed,
-            ...createDurationResult(payload.elapsedMs),
-          },
-        });
-      } else if (score) {
-        runtimeLogger.warn('CMI5 mastery score missing, skipping passed/failed', {
-          score: score.raw,
-        });
+      if (moveOn === MOVE_ON.Passed || moveOn === MOVE_ON.CompletedAndPassed) {
+        if (!successEvaluation) {
+          runtimeLogger.warn('CMI5 complete requires a pass/fail decision, but success cannot be determined', {
+            moveOn,
+            score: latestScore ? latestScore.raw : null,
+            masteryScore: launchData.masteryScore,
+          });
+          return false;
+        }
       }
+
+      if (moveOn === MOVE_ON.Passed) {
+        await postPassFailStatement(successEvaluation, payload.elapsedMs);
+        return terminate(payload.elapsedMs);
+      }
+
+      if (moveOn === MOVE_ON.CompletedAndPassed) {
+        await postPassFailStatement(successEvaluation, payload.elapsedMs);
+        await postCompletedStatement(payload.elapsedMs);
+        return terminate(payload.elapsedMs);
+      }
+
+      await postCompletedStatement(payload.elapsedMs);
       return terminate(payload.elapsedMs);
     },
     async timeout(payload = {}) {

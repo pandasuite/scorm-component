@@ -47,8 +47,10 @@ export function createTracker({
 
   let startTime = null;
   let currentScore = 0;
+  let sessionStarting = false;
   let sessionStarted = false;
   let sessionFinished = false;
+  let startPromise = null;
 
   function getProtocol() {
     return adapter && adapter.protocol ? adapter.protocol : null;
@@ -57,6 +59,7 @@ export function createTracker({
   function getState() {
     return {
       protocol: getProtocol(),
+      sessionStarting,
       sessionStarted,
       sessionFinished,
       startTime,
@@ -149,6 +152,20 @@ export function createTracker({
     return true;
   }
 
+  async function waitForPendingStart(actionName) {
+    if (!sessionStarting || !startPromise) {
+      return true;
+    }
+
+    const didStart = await startPromise;
+    if (!didStart) {
+      runtimeLogger.warn(`Ignoring "${actionName}" because the session failed to start`, getState());
+      return false;
+    }
+
+    return true;
+  }
+
   return {
     getState,
     async start() {
@@ -176,44 +193,71 @@ export function createTracker({
         return true;
       }
 
-      const restored = await restoreState();
-      startTime = restored.elapsedMs == null ? getNow() : getNow() - restored.elapsedMs;
-
-      const { ok: didStart } = normalizeActionResult(await adapter.start(getBasePayload()));
-      if (!didStart) {
-        runtimeLogger.error('Session start failed', {
-          protocol: getProtocol(),
-          scoreMin,
-          scoreMax,
-        });
-        return false;
+      if (sessionStarting && startPromise) {
+        return startPromise;
       }
 
-      sessionStarted = true;
-      sessionFinished = false;
+      sessionStarting = true;
+      const currentStartPromise = (async () => {
+        try {
+          const restored = await restoreState();
+          startTime = restored.elapsedMs == null ? getNow() : getNow() - restored.elapsedMs;
 
-      if (restored.progressPercent != null) {
-        await this.progress(restored.progressPercent);
-      }
+          const { ok: didStart } = normalizeActionResult(await adapter.start(getBasePayload()));
+          if (!didStart) {
+            sessionStarting = false;
+            startTime = null;
+            runtimeLogger.error('Session start failed', {
+              protocol: getProtocol(),
+              scoreMin,
+              scoreMax,
+            });
+            return false;
+          }
 
-      if (restored.score != null) {
-        currentScore = normalizeScore(restored.score);
-        await this.score(currentScore);
-      }
+          sessionStarting = false;
+          sessionStarted = true;
+          sessionFinished = false;
 
-      runtimeLogger.info('Session started', {
-        protocol: getProtocol(),
-        scoreMin,
-        scoreMax,
-        startTime,
-        restoredProgress: restored.progressRatio,
-        restoredScore: restored.score,
-      });
-      return true;
+          if (restored.progressPercent != null) {
+            await this.progress(restored.progressPercent);
+          }
+
+          if (restored.score != null) {
+            currentScore = normalizeScore(restored.score);
+            await this.score(currentScore);
+          }
+
+          runtimeLogger.info('Session started', {
+            protocol: getProtocol(),
+            scoreMin,
+            scoreMax,
+            startTime,
+            restoredProgress: restored.progressRatio,
+            restoredScore: restored.score,
+          });
+          return true;
+        } catch (error) {
+          sessionStarting = false;
+          startTime = null;
+          throw error;
+        } finally {
+          if (startPromise === currentStartPromise) {
+            startPromise = null;
+          }
+        }
+      })();
+
+      startPromise = currentStartPromise;
+      return currentStartPromise;
     },
     async progress(value) {
       const progressPercent = normalizeProgressPercent(value);
       const progressRatio = progressPercent / 100;
+
+      if (!(await waitForPendingStart('progress'))) {
+        return false;
+      }
 
       if (!ensureSessionStarted('progress')) {
         return false;
@@ -252,11 +296,15 @@ export function createTracker({
       return outcome.ok;
     },
     async score(value) {
-      currentScore = normalizeScore(value);
+      if (!(await waitForPendingStart('score'))) {
+        return false;
+      }
 
       if (!ensureSessionStarted('score')) {
         return false;
       }
+
+      currentScore = normalizeScore(value);
 
       const payload = getBasePayload({
         score: currentScore,
@@ -292,6 +340,10 @@ export function createTracker({
       return outcome.ok;
     },
     async incScore(value) {
+      if (!(await waitForPendingStart('incScore'))) {
+        return false;
+      }
+
       if (!ensureSessionStarted('incScore')) {
         return false;
       }
@@ -300,6 +352,10 @@ export function createTracker({
       return this.score(currentScore);
     },
     async decScore(value) {
+      if (!(await waitForPendingStart('decScore'))) {
+        return false;
+      }
+
       if (!ensureSessionStarted('decScore')) {
         return false;
       }
@@ -308,6 +364,10 @@ export function createTracker({
       return this.score(currentScore);
     },
     async incomplete() {
+      if (!(await waitForPendingStart('incomplete'))) {
+        return false;
+      }
+
       if (!ensureSessionStarted('incomplete')) {
         return false;
       }
@@ -338,6 +398,10 @@ export function createTracker({
       return outcome.ok;
     },
     async complete() {
+      if (!(await waitForPendingStart('complete'))) {
+        return false;
+      }
+
       if (!ensureSessionStarted('complete')) {
         return false;
       }
@@ -365,6 +429,10 @@ export function createTracker({
       return false;
     },
     async timedout() {
+      if (!(await waitForPendingStart('timedout'))) {
+        return false;
+      }
+
       if (!ensureSessionStarted('timedout')) {
         return false;
       }

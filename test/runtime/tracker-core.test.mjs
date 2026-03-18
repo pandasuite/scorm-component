@@ -55,6 +55,18 @@ function createAdapter(overrides = {}) {
   };
 }
 
+function createDeferred() {
+  let resolve;
+  const promise = new Promise((nextResolve) => {
+    resolve = nextResolve;
+  });
+
+  return {
+    promise,
+    resolve,
+  };
+}
+
 test('start initializes once', async () => {
   const adapter = createAdapter();
   const tracker = createTracker({
@@ -70,6 +82,38 @@ test('start initializes once', async () => {
   assert.equal(await tracker.start(), true);
   assert.equal(await tracker.start(), true);
   assert.equal(adapter.calls.start.length, 1);
+});
+
+test('progress waits for a pending start instead of being dropped', async () => {
+  const deferred = createDeferred();
+  const adapter = createAdapter({
+    start(payload) {
+      this.calls.start.push(payload);
+      return deferred.promise;
+    },
+  });
+  const tracker = createTracker({
+    adapter,
+    properties: {
+      'score.min': 0,
+      'score.max': 100,
+    },
+    logger: createLogger(),
+    getNow: () => 1000,
+  });
+
+  const startPromise = tracker.start();
+  const progressPromise = tracker.progress(25);
+
+  assert.equal(adapter.calls.setProgress.length, 0);
+
+  deferred.resolve(true);
+
+  assert.equal(await startPromise, true);
+  assert.equal(await progressPromise, true);
+  assert.equal(adapter.calls.start.length, 1);
+  assert.equal(adapter.calls.setProgress.length, 1);
+  assert.equal(tracker.getState().sessionStarted, true);
 });
 
 test('progress before start is ignored', async () => {

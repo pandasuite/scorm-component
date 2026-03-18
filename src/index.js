@@ -429,7 +429,10 @@ function createRuntimeTracker() {
 function refreshRuntimeTracker() {
   const currentState = tracker ? tracker.getState() : null;
 
-  if (currentState && (currentState.sessionStarted || currentState.sessionFinished)) {
+  if (
+    currentState
+    && (currentState.sessionStarting || currentState.sessionStarted || currentState.sessionFinished)
+  ) {
     return;
   }
 
