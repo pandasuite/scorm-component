@@ -2,7 +2,6 @@ const REQUIRED_CMI5_PARAMS = [
   'endpoint',
   'fetch',
   'registration',
-  'activityid',
   'actor',
 ];
 
@@ -40,12 +39,17 @@ function parseActorJson(actorValue) {
 export function parseCmi5LaunchContext(queryString = '') {
   const searchParams = new URLSearchParams(queryString);
   const values = {};
+  const activityId = searchParams.get('activityId') || searchParams.get('activityid');
 
   REQUIRED_CMI5_PARAMS.forEach((key) => {
     values[key] = searchParams.get(key);
   });
 
   const missingParams = REQUIRED_CMI5_PARAMS.filter((key) => !hasValue(values[key]));
+  if (!hasValue(activityId)) {
+    missingParams.push('activityId');
+  }
+
   if (missingParams.length > 0) {
     return null;
   }
@@ -59,8 +63,8 @@ export function parseCmi5LaunchContext(queryString = '') {
     endpoint: values.endpoint,
     fetch: values.fetch,
     registration: values.registration,
-    activityId: values.activityid,
-    activityid: values.activityid,
+    activityId,
+    activityid: activityId,
     actor: values.actor,
     actorJson,
   };

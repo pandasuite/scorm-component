@@ -260,3 +260,42 @@ test('start replays restored state through companion adapters after primary star
   assert.equal(companionCalls.setProgress.length, 1);
   assert.equal(companionCalls.setScore.length, 1);
 });
+
+test('complete preserves restored companion score and elapsed time after a relaunch', async () => {
+  let now = 5000;
+  const completeCalls = [];
+  const tracker = createTracker({
+    adapter: createAdapter({
+      complete(payload) {
+        completeCalls.push(payload);
+        return true;
+      },
+    }),
+    companionAdapters: [{
+      restore() {
+        return {
+          elapsedMs: 3000,
+          score: 80,
+        };
+      },
+      setScore() {
+        return true;
+      },
+    }],
+    properties: {
+      'score.min': 0,
+      'score.max': 100,
+    },
+    logger: createLogger(),
+    getNow: () => now,
+  });
+
+  assert.equal(await tracker.start(), true);
+
+  now = 7000;
+
+  assert.equal(await tracker.complete(), true);
+  assert.equal(completeCalls.length, 1);
+  assert.equal(completeCalls[0].currentScore, 80);
+  assert.equal(completeCalls[0].elapsedMs, 5000);
+});

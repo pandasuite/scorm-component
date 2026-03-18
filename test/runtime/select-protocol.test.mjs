@@ -16,7 +16,7 @@ function buildCmi5QueryString(overrides = {}) {
     endpoint: 'https://lrs.example.com/xapi/',
     fetch: 'https://example.com/cmi5/fetch',
     registration: 'reg-123',
-    activityid: 'act-456',
+    activityId: 'act-456',
     actor: JSON.stringify(actor),
     ...overrides,
   };
@@ -45,7 +45,25 @@ test('selectProtocol prefers cmi5 when all launch params exist', () => {
 
   assert.equal(result.protocol, 'cmi5');
   assert.equal(result.context.cmi5.endpoint, 'https://lrs.example.com/xapi/');
+  assert.equal(result.context.cmi5.activityId, 'act-456');
   assert.deepEqual(result.context.cmi5.actorJson, actor);
+});
+
+test('selectProtocol still accepts legacy lowercase activityid launch params', () => {
+  const { queryString } = buildCmi5QueryString({
+    activityId: null,
+    activityid: 'act-legacy',
+  });
+
+  const result = selectProtocol({
+    queryString,
+    hasScorm2004: true,
+    hasScorm12: true,
+  });
+
+  assert.equal(result.protocol, 'cmi5');
+  assert.equal(result.context.cmi5.activityId, 'act-legacy');
+  assert.equal(result.context.cmi5.activityid, 'act-legacy');
 });
 
 test('selectProtocol falls back to scorm2004 when cmi5 params are incomplete', () => {

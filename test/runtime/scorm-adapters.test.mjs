@@ -167,3 +167,25 @@ test('local adapter restores and syncs persisted state', () => {
     ['synchronize', [50, 'syncScore', true]],
   ]);
 });
+
+test('local adapter supports a custom storage namespace', () => {
+  const storage = createStorage({
+    'unit:cmi5:reg-1_total_time': '3000',
+    'unit:cmi5:reg-1_progress': '0.25',
+    'unit:cmi5:reg-1_score': '42',
+    unit_total_time: '9999',
+  });
+  const adapter = createLocalAdapter({
+    enabled: true,
+    unitId: 'unit',
+    storageKeyPrefix: 'unit:cmi5:reg-1',
+    storage,
+  });
+
+  assert.deepEqual(adapter.restore(), {
+    elapsedMs: 3000,
+    progressPercent: 25,
+    progressRatio: 0.25,
+    score: 42,
+  });
+});

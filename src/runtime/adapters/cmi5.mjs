@@ -6,6 +6,7 @@ const LEARNER_PREFERENCES_PROFILE_ID = 'cmi5LearnerPreferences';
 const PROGRESS_EXTENSION_ID = 'https://w3id.org/xapi/cmi5/result/extensions/progress';
 const CMI5_CATEGORY_ID = 'https://w3id.org/xapi/cmi5/context/categories/cmi5';
 const MOVEON_CATEGORY_ID = 'https://w3id.org/xapi/cmi5/context/categories/moveon';
+const MASTERY_SCORE_EXTENSION_ID = 'https://w3id.org/xapi/cmi5/context/extensions/masteryscore';
 
 const MOVE_ON = {
   Completed: 'Completed',
@@ -317,6 +318,7 @@ export function createCmi5Adapter({
   function buildContext({
     includeCmi5Category = false,
     includeMoveOnCategory = false,
+    masteryScore = null,
   } = {}) {
     const context = cloneJson(launchData.contextTemplate);
 
@@ -331,6 +333,10 @@ export function createCmi5Adapter({
       ensureCategoryActivity(context, MOVEON_CATEGORY_ID);
     }
 
+    if (masteryScore != null) {
+      context.extensions[MASTERY_SCORE_EXTENSION_ID] = masteryScore;
+    }
+
     return context;
   }
 
@@ -339,6 +345,7 @@ export function createCmi5Adapter({
     result = null,
     includeCmi5Category = false,
     includeMoveOnCategory = false,
+    masteryScore = null,
   }) {
     return {
       id: createStatementId(),
@@ -356,6 +363,7 @@ export function createCmi5Adapter({
       context: buildContext({
         includeCmi5Category,
         includeMoveOnCategory,
+        masteryScore,
       }),
       timestamp: new Date(getNow()).toISOString(),
       ...(result ? { result } : {}),
@@ -367,12 +375,14 @@ export function createCmi5Adapter({
     result = null,
     includeCmi5Category = false,
     includeMoveOnCategory = false,
+    masteryScore = null,
   }) {
     const statement = buildStatement({
       verb,
       result,
       includeCmi5Category,
       includeMoveOnCategory,
+      masteryScore,
     });
     const response = await fetchFn(buildUrl(launchContext.endpoint, 'statements'), {
       method: 'POST',
@@ -440,19 +450,24 @@ export function createCmi5Adapter({
     verb,
     result = null,
     includeMoveOnCategory = false,
+    masteryScore = null,
   }) {
     return postStatement({
       verb,
       result,
       includeCmi5Category: true,
       includeMoveOnCategory,
+      masteryScore,
     });
   }
 
   async function postPassFailStatement(successEvaluation, elapsedMs) {
+    const masteryScore = normalizeNumber(launchData.masteryScore);
+
     return postCmi5DefinedStatement({
       verb: successEvaluation.passed ? VERBS.passed : VERBS.failed,
       includeMoveOnCategory: true,
+      masteryScore,
       result: {
         score: {
           raw: successEvaluation.score.raw,

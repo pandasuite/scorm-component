@@ -20,11 +20,20 @@ function setStoredValue(storage, key, value) {
 export function createLocalAdapter({
   enabled = false,
   unitId = null,
+  storageKeyPrefix = null,
   storage = null,
   send = null,
 } = {}) {
+  function getStoragePrefix() {
+    if (typeof storageKeyPrefix === 'string' && storageKeyPrefix.length > 0) {
+      return storageKeyPrefix;
+    }
+
+    return unitId;
+  }
+
   function canPersist() {
-    return enabled && unitId != null && storage != null;
+    return enabled && getStoragePrefix() != null && storage != null;
   }
 
   function synchronize(eventName, payload) {
@@ -38,7 +47,7 @@ export function createLocalAdapter({
       return;
     }
 
-    setStoredValue(storage, `${unitId}_total_time`, elapsedMs);
+    setStoredValue(storage, `${getStoragePrefix()}_total_time`, elapsedMs);
   }
 
   return {
@@ -48,9 +57,10 @@ export function createLocalAdapter({
         return null;
       }
 
-      const elapsedMs = parseStoredNumber(storage.getItem(`${unitId}_total_time`));
-      const progressRatio = parseStoredNumber(storage.getItem(`${unitId}_progress`));
-      const score = parseStoredNumber(storage.getItem(`${unitId}_score`));
+      const storagePrefix = getStoragePrefix();
+      const elapsedMs = parseStoredNumber(storage.getItem(`${storagePrefix}_total_time`));
+      const progressRatio = parseStoredNumber(storage.getItem(`${storagePrefix}_progress`));
+      const score = parseStoredNumber(storage.getItem(`${storagePrefix}_score`));
 
       if (elapsedMs == null && progressRatio == null && score == null) {
         return null;
@@ -73,7 +83,7 @@ export function createLocalAdapter({
       setElapsedTime(elapsedMs);
 
       if (canPersist()) {
-        setStoredValue(storage, `${unitId}_progress`, progressRatio);
+        setStoredValue(storage, `${getStoragePrefix()}_progress`, progressRatio);
         synchronize('synchronize', [progressRatio, 'syncProgress', true]);
       }
       return true;
@@ -87,7 +97,7 @@ export function createLocalAdapter({
       setElapsedTime(elapsedMs);
 
       if (canPersist()) {
-        setStoredValue(storage, `${unitId}_score`, score);
+        setStoredValue(storage, `${getStoragePrefix()}_score`, score);
         synchronize('synchronize', [
           (score * 100) / (scoreMax - scoreMin),
           'syncScore',

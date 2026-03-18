@@ -376,11 +376,24 @@ function sendBridgeEvent(eventName, payload) {
   PandaBridge.send(eventName, payload);
 }
 
+function getLocalStorageKeyPrefix(unitId) {
+  if (
+    runtimeSelection.protocol === 'cmi5'
+    && runtimeSelection.context.cmi5
+    && unitId
+  ) {
+    return `${unitId}:cmi5:${runtimeSelection.context.cmi5.registration}`;
+  }
+
+  return unitId;
+}
+
 function createRuntimeTracker() {
   const runtimeLogger = getRuntimeLogger();
   const storage = getBrowserStorage();
   const isLocalStorage = !!(properties && properties.isLocalStorage);
   const unitId = properties && properties[PandaBridge.UNIQUE_ID];
+  const localStorageKeyPrefix = getLocalStorageKeyPrefix(unitId);
   const companionAdapters = [];
   let adapter = null;
 
@@ -404,6 +417,7 @@ function createRuntimeTracker() {
     adapter = createLocalAdapter({
       enabled: isLocalStorage,
       unitId,
+      storageKeyPrefix: localStorageKeyPrefix,
       storage,
       send: sendBridgeEvent,
     });
@@ -413,6 +427,7 @@ function createRuntimeTracker() {
     companionAdapters.push(createLocalAdapter({
       enabled: true,
       unitId,
+      storageKeyPrefix: localStorageKeyPrefix,
       storage,
       send: sendBridgeEvent,
     }));

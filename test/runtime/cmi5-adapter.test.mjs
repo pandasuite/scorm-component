@@ -7,6 +7,7 @@ import { createCmi5Adapter } from '../../src/runtime/adapters/cmi5.mjs';
 
 const ENDPOINT = 'https://lrs.example.com/xapi/';
 const FETCH_URL = 'https://lms.example.com/cmi5/fetch-token';
+const MASTERY_SCORE_EXTENSION_ID = 'https://w3id.org/xapi/cmi5/context/extensions/masteryscore';
 
 function createLaunchContext() {
   return {
@@ -229,6 +230,7 @@ test('cmi5 complete emits passed, completed, and terminated for CompletedAndPass
   assert.equal(harness.statements[1].result.score.raw, 80);
   assert.equal(harness.statements[1].result.score.scaled, 0.8);
   assert.equal(harness.statements[1].result.success, true);
+  assert.equal(harness.statements[1].context.extensions[MASTERY_SCORE_EXTENSION_ID], 0.75);
   assert.equal(harness.statements[2].verb.id, 'http://adlnet.gov/expapi/verbs/completed');
   assert.equal(harness.statements[2].result.completion, true);
   assert.equal(harness.statements[3].verb.id, 'http://adlnet.gov/expapi/verbs/terminated');
@@ -283,6 +285,7 @@ test('cmi5 Passed moveOn emits failed and terminated without completed when lear
     'http://adlnet.gov/expapi/verbs/failed',
     'http://adlnet.gov/expapi/verbs/terminated',
   ]);
+  assert.equal(harness.statements[1].context.extensions[MASTERY_SCORE_EXTENSION_ID], 0.75);
 });
 
 test('cmi5 Passed moveOn fails cleanly when success cannot be evaluated', async () => {
