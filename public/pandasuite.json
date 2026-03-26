@@ -1,7 +1,14 @@
 {
+  "meta": {
+    "stype": "scorm",
+    "componentURL": "https://github.com/pandasuite/scorm-component/",
+    "description": "Reports learner progress, completion status, and scores to an LMS platform via SCORM 1.2, SCORM 2004, or cmi5. Essential for e-learning modules, quizzes, and training applications.",
+    "locale_description": {
+      "fr_FR": "Rapporte la progression de l'apprenant, le statut de complétion et les scores à une plateforme LMS via SCORM 1.2, SCORM 2004 ou cmi5. Essentiel pour les modules e-learning, les quiz et les applications de formation."
+    }
+  },
   "version": "2.0.0",
   "main": "",
-
   "properties": [
     {
       "id": "score.min",
@@ -10,7 +17,11 @@
       "locale_name": {
         "fr_FR": "Score minimum"
       },
-      "value": 0
+      "value": 0,
+      "description": "Minimum possible score for the module.",
+      "locale_description": {
+        "fr_FR": "Score minimum possible pour le module."
+      }
     },
     {
       "id": "score.max",
@@ -19,7 +30,11 @@
       "locale_name": {
         "fr_FR": "Score maximum"
       },
-      "value": 100
+      "value": 100,
+      "description": "Maximum possible score for the module.",
+      "locale_description": {
+        "fr_FR": "Score maximum possible pour le module."
+      }
     },
     {
       "id": "isLocalStorage",
@@ -28,16 +43,23 @@
       "locale_name": {
         "fr_FR": "Persistance"
       },
-      "separator": true
+      "separator": true,
+      "description": "Store progress locally when no LMS is available.",
+      "locale_description": {
+        "fr_FR": "Stocker la progression localement quand aucun LMS n'est disponible."
+      }
     }
   ],
-
   "actions": [
     {
       "id": "start",
       "name": "Start the session",
       "locale_name": {
         "fr_FR": "Commencer la session"
+      },
+      "description": "Signal the LMS that the learner has started the module.",
+      "locale_description": {
+        "fr_FR": "Signaler au LMS que l'apprenant a commencé le module."
       }
     },
     {
@@ -45,6 +67,10 @@
       "name": "Set session as incomplete",
       "locale_name": {
         "fr_FR": "Définir la session comme incomplète"
+      },
+      "description": "Mark the module as incomplete in the LMS.",
+      "locale_description": {
+        "fr_FR": "Marquer le module comme incomplet dans le LMS."
       }
     },
     {
@@ -52,6 +78,10 @@
       "name": "Set session as complete",
       "locale_name": {
         "fr_FR": "Définir la session comme terminée"
+      },
+      "description": "Mark the module as completed in the LMS.",
+      "locale_description": {
+        "fr_FR": "Marquer le module comme terminé dans le LMS."
       }
     },
     {
@@ -59,6 +89,10 @@
       "name": "Set session as timed out",
       "locale_name": {
         "fr_FR": "Définir la session comme expirée"
+      },
+      "description": "Signal the LMS that the module session has timed out.",
+      "locale_description": {
+        "fr_FR": "Signaler au LMS que la session du module a expiré."
       }
     },
     {
@@ -72,10 +106,18 @@
           "id": "value",
           "name": "Progress",
           "type": "Float",
-          "value": 0
+          "value": 0,
+          "description": "Progress value between 0 and 1.",
+          "locale_description": {
+            "fr_FR": "Valeur de progression entre 0 et 1."
+          }
         }
-      ]
-    },        
+      ],
+      "description": "Report learner progress to the LMS as a percentage.",
+      "locale_description": {
+        "fr_FR": "Rapporter la progression de l'apprenant au LMS en pourcentage."
+      }
+    },
     {
       "id": "score",
       "name": "Set score",
@@ -87,9 +129,17 @@
           "id": "value",
           "name": "Score",
           "type": "Integer",
-          "value": 0
+          "value": 0,
+          "description": "Score value (must be between score.min and score.max).",
+          "locale_description": {
+            "fr_FR": "Valeur du score (doit être entre score.min et score.max)."
+          }
         }
-      ]
+      ],
+      "description": "Set the learner's score in the LMS.",
+      "locale_description": {
+        "fr_FR": "Définir le score de l'apprenant dans le LMS."
+      }
     },
     {
       "id": "incScore",
@@ -102,9 +152,17 @@
           "id": "value",
           "name": "Score",
           "type": "Integer",
-          "value": 0
+          "value": 0,
+          "description": "Amount to add to the current score.",
+          "locale_description": {
+            "fr_FR": "Valeur à ajouter au score actuel."
+          }
         }
-      ]
+      ],
+      "description": "Increment the learner's score.",
+      "locale_description": {
+        "fr_FR": "Incrémenter le score de l'apprenant."
+      }
     },
     {
       "id": "decScore",
@@ -117,18 +175,29 @@
           "id": "value",
           "name": "Score",
           "type": "Integer",
-          "value": 0
+          "value": 0,
+          "description": "Amount to subtract from the current score.",
+          "locale_description": {
+            "fr_FR": "Valeur à soustraire du score actuel."
+          }
         }
-      ]
+      ],
+      "description": "Decrement the learner's score.",
+      "locale_description": {
+        "fr_FR": "Décrémenter le score de l'apprenant."
+      }
     }
   ],
-
   "synchronization": [
     {
       "id": "syncProgress",
       "name": "Synchronize progression",
       "locale_name": {
         "fr_FR": "Synchroniser progression"
+      },
+      "description": "Synchronize progress value with another component.",
+      "locale_description": {
+        "fr_FR": "Synchroniser la valeur de progression avec un autre composant."
       }
     },
     {
@@ -136,6 +205,10 @@
       "name": "Synchronize score",
       "locale_name": {
         "fr_FR": "Synchroniser score "
+      },
+      "description": "Synchronize score value with another component.",
+      "locale_description": {
+        "fr_FR": "Synchroniser la valeur du score avec un autre composant."
       }
     }
   ]
